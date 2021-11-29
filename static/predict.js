@@ -1,16 +1,82 @@
-let imageLoaded = false;
-$("#image-selector").change(function () {
+
+//global 
+var total_car_count = 0;
+console.log("typeof total_car_count");
+console.log(typeof total_car_count);
+
+var preview = document.querySelector('#imagesOverlay');
+
+var total_car_count_div = document.querySelector('#total_car_count');
+
+function removeAllChildNodes(parent) {
+    while (parent.firstChild) {
+        parent.removeChild(parent.firstChild);
+    }
+}
+
+function readAndPreview(file) {
+	console.log('readAndPreview called');
+
 	imageLoaded = false;
 	let reader = new FileReader();
 	reader.onload = function () {
 		let dataURL = reader.result;
-		$("#selectedImage").attr("src", dataURL);
-		removeHighlights();
+
+		const newDiv = document.createElement("div");
+		newDiv.id = file.name;
+		newDiv.className = 'imageOverlay';
+
+		var image = new Image();
+		image.height = 500;
+        image.title = file.name;
+		image.className = 'ml-3';
+		image.src = dataURL;
+
+		newDiv.appendChild( image );
+
+		preview.appendChild( newDiv );
+
+		//$("#selectedImage").attr("src", dataURL);
+		//removeHighlights();
+		
 		imageLoaded = true;
+
+		console.log('to begin async function');
+		(async () => {
+			console.log('to begin async function inside');
+			const image2 = await loadImage(image);
+			console.log('load image done');
+			const predictions = await predictLogos(image2);
+			await highlightResults(predictions, image.title);
+		})()
+
 	}
 	
-	let file = $("#image-selector").prop('files')[0];
+	//let file = $("#image-selector").prop('files')[0];
 	reader.readAsDataURL(file);
+
+}
+
+
+
+let imageLoaded = false;
+$("#image-selector").change(function () {
+
+	removeAllChildNodes(preview);
+	var total_car_count = 0;
+	total_car_count_div.innerText = "Total Car Count:" + total_car_count;
+	
+	var files = document.querySelector('input[type=file]').files;
+
+	if (files) {
+		console.log("files true");
+		
+		files.forEach(function(item) {
+			console.log('in loop');
+			readAndPreview(item);
+		});
+	  }
+
 });
 
 function showProgress(percentage) {
@@ -43,15 +109,16 @@ function _logistic(x) {
 	}
 }
 
-async function loadImage(onProgress) {
+async function loadImage(in_image,onProgress) {
 	console.log( "Pre-processing image..." );
 	await $('.progress-bar').html("Pre-processing image").promise();
 	
-	const pixels = $('#selectedImage').get(0);
+	//const pixels = $('#selectedImage').get(0);
 		
 	// Pre-process the image
 	const input_size = model.inputs[0].shape[1];
-	let image = tf.browser.fromPixels(pixels, 3);
+	//let image = tf.browser.fromPixels(pixels, 3);
+	let image = tf.browser.fromPixels(in_image, 3);
 	image = tf.image.resizeBilinear(image.expandDims().toFloat(), [input_size, input_size]);
 	if (is_new_od_model) {
 		console.log( "Object Detection Model V2 detected." );
@@ -63,6 +130,7 @@ async function loadImage(onProgress) {
 
 const ANCHORS = [0.573, 0.677, 1.87, 2.06, 3.34, 5.47, 7.88, 3.53, 9.77, 9.17];
 const NEW_OD_OUTPUT_TENSORS = ['detected_boxes', 'detected_scores', 'detected_classes'];
+
 async function predictLogos(inputs) {
 	console.log( "Running predictions..." );
 	await $('.progress-bar').html("Running predictions").promise();
@@ -73,6 +141,7 @@ async function predictLogos(inputs) {
 	// Post processing for old models.
 	if (predictions.length != 3) {
 		console.log( "Post processing..." );
+		
 		await $('.progress-bar').html("Post-processing V1 model").promise();
 	    const num_anchor = ANCHORS.length / 2;
 		const channels = predictions[0][0][0].length;
@@ -112,7 +181,9 @@ async function predictLogos(inputs) {
 		scores = tf.tensor1d(scores);
 		classes = tf.tensor1d(classes);
 
-		const selected_indices = await tf.image.nonMaxSuppressionAsync(boxes, scores, 10);
+		
+
+		const selected_indices = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, iou_threshold=0.4);
 		predictions = [await boxes.gather(selected_indices).array(), await scores.gather(selected_indices).array(), await classes.gather(selected_indices).array()];
 	}
 
@@ -120,30 +191,40 @@ async function predictLogos(inputs) {
 }
 
 var children = [];
+
 function removeHighlights() {
 	for (let i = 0; i < children.length; i++) {
 		imageOverlay.removeChild(children[i]);
 	}
 	children = [];
 }
-async function highlightResults(predictions) {
+async function highlightResults(predictions, image_title) {
 	console.log( "Highlighting results..." );
 	await $('.progress-bar').html("Highlighting results").promise();
 
-	removeHighlights();
+	//removeHighlights();
+	console.log("image_title title is: " + image_title);
+
+	var overlay_image = document.querySelector('[title="'+image_title+'"]');
+	var overlay_div = document.querySelector('[id="'+image_title+'"]');
+	console.log(overlay_div);
+
+	var count_predictions_above_threshold = 0;
 	
 	for (let n = 0; n < predictions[0].length; n++) {
 		// Check scores
-		if (predictions[1][n] > 0.66) {
+		if (predictions[1][n] > 0.30) {
+			count_predictions_above_threshold += 1
+
 			const p = document.createElement('p');
 			p.innerText = TARGET_CLASSES[predictions[2][n]]  + ': ' 
 				+ Math.round(parseFloat(predictions[1][n]) * 100) 
 				+ '%';
 			
-			bboxLeft = (predictions[0][n][0] * selectedImage.width) + 10;
-			bboxTop = (predictions[0][n][1] * selectedImage.height) - 10;
-			bboxWidth = (predictions[0][n][2] * selectedImage.width) - bboxLeft + 20;
-			bboxHeight = (predictions[0][n][3] * selectedImage.height) - bboxTop + 10;
+			bboxLeft = (predictions[0][n][0] * overlay_image.width) + 10;
+			bboxTop = (predictions[0][n][1] * overlay_image.height) - 10;
+			bboxWidth = (predictions[0][n][2] * overlay_image.width) - bboxLeft + 20;
+			bboxHeight = (predictions[0][n][3] * overlay_image.height) - bboxTop + 10;
 			
 			p.style = 'margin-left: ' + bboxLeft + 'px; margin-top: '
 				+ (bboxTop - 10) + 'px; width: ' 
@@ -154,12 +235,30 @@ async function highlightResults(predictions) {
 				+ bboxTop + 'px; width: ' 
 				+ bboxWidth + 'px; height: '
 				+ bboxHeight + 'px;';
-			imageOverlay.appendChild(highlighter);
-			imageOverlay.appendChild(p);
+
+			//imageOverlay.appendChild(highlighter);
+			//imageOverlay.appendChild(p);
+
+			overlay_div.appendChild(highlighter);
+			overlay_div.appendChild(p);
+			
 			children.push(highlighter);
 			children.push(p);
 		}
 	}
+
+	const p_count = document.createElement('p');
+	p_count.innerText = "car count is: " + count_predictions_above_threshold;
+	p_count.style = 'margin-left: ' + 15 + 'px; margin-top: '
+				+ (0) + 'px; width: ' 
+				+ 100 + 'px; top: 0; left: 0; background-color:blue;';
+	overlay_div.appendChild(p_count);
+	console.log("predictions length is: " + count_predictions_above_threshold);
+	console.log(typeof count_predictions_above_threshold);
+	console.log(typeof total_car_count);
+	total_car_count = total_car_count + count_predictions_above_threshold;
+	console.log("running total: " + total_car_count);
+	total_car_count_div.innerText = "Total Car Count:" + total_car_count;
 }
 
 $("#predict-button").click(async function () {

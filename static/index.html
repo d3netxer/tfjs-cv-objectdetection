@@ -33,7 +33,7 @@
 	</head>
 	<body>
 		<nav class="navbar navbar-expand-md navbar-dark fixed-top bg-dark">
-			<a class="navbar-brand" href="/index.html">Azure Logo Detector</a>
+			<a class="navbar-brand" href="/index.html">Car Counter</a>
 			<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
 				<span class="navbar-toggler-icon"></span>
 			</button>
@@ -53,18 +53,18 @@
 			</div>
 			<div class="row">
 				<div class="col-6">
-					<input id="image-selector" class="form-control border-0" type="file">
+					<input id="image-selector" class="form-control border-0" type="file" multiple="multiple">
 				</div>
 				<div class="col-6">
-					<button id="predict-button" class="btn btn-primary float-right">Predict</button>
+					<!--<button id="predict-button" class="btn btn-primary float-right">Predict</button>-->
 				</div>
 			</div>
 			<hr>
 			<div class="row">
 				<div class="col-12">
-					<h2 class="ml-3">Image</h2>
-					<div id="imageOverlay" class="imageOverlay">
-						<img id="selectedImage" class="ml-3" width="500" alt=""> 
+					<h2 id="total_car_count" class="ml-3">Total Car Count:</h2>
+					<div id="imagesOverlay" class="">
+						<!--<img id="selectedImage" class="ml-3" width="500" alt=""> -->
 					</div>
 				</div>
 			</div>

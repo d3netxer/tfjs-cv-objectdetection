@@ -1,5 +1,5 @@
 TARGET_CLASSES = {
-  0: "Active Directory",
+  0: "car",
   1: "App Service",
   2: "App Insights",
   3: "Azure Functions",
